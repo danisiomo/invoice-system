@@ -58,7 +58,6 @@ uvicorn app.main:app --reload --log-level debug
 Сервер доступен по адресу http://localhost:8000
 
 API документация
-После запуска сервера:
 
 Swagger: http://localhost:8000/docs
 
