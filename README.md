@@ -14,7 +14,7 @@
 ### 1. Клонировать репозиторий
 
 ```bash
-git clone <url>
+git clone https://github.com/danisiomo/invoice-system.git
 cd invoice-system
 ```
 
