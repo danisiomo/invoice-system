@@ -46,15 +46,16 @@ pip install -r requirements.txt
 ```
 
 ### 4. Применить миграции
-Bash
-
+```bash
 alembic upgrade head
+```
+
 ### 5. Запустить сервер
 
 ```bash
 uvicorn app.main:app --reload --log-level debug
 ```
-Сервер доступен по адресу http://localhost:8000.
+Сервер доступен по адресу http://localhost:8000
 
 API документация
 После запуска сервера:
