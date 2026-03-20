@@ -55,11 +55,8 @@ alembic upgrade head
 ```bash
 uvicorn app.main:app --reload --log-level debug
 ```
-Сервер доступен по адресу http://localhost:8000
 
-API документация
-
-Swagger: http://localhost:8000/docs
+Swagger документация доступна по адресу http://localhost:8000/docs
 
 ### 6. Примеры запросов
 
