@@ -14,7 +14,7 @@
 ### 1. Клонировать репозиторий
 
 ```bash
-git clone <url>
+git clone https://github.com/danisiomo/invoice-system.git
 cd invoice-system
 ```
 
@@ -38,6 +38,7 @@ python -m venv venv
 Активировать виртуальное окружение:
 
 Windows: venv\Scripts\activate
+
 Mac/Linux: source venv/bin/activate
 
 ```bash
@@ -45,20 +46,17 @@ pip install -r requirements.txt
 ```
 
 ### 4. Применить миграции
-Bash
-
+```bash
 alembic upgrade head
+```
+
 ### 5. Запустить сервер
 
 ```bash
 uvicorn app.main:app --reload --log-level debug
 ```
-Сервер доступен по адресу http://localhost:8000.
 
-API документация
-После запуска сервера:
-
-Swagger: http://localhost:8000/docs
+Swagger документация доступна по адресу http://localhost:8000/docs
 
 ### 6. Примеры запросов
 
