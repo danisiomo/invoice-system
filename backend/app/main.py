@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.api.auth import router as auth_router
+from app.api.data_load import router as data_load_router
+from app.api.references import router as references_router
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -18,6 +20,13 @@ app.add_middleware(
 )
 
 app.include_router(auth_router, prefix=settings.API_V1_PREFIX)
+app.include_router(data_load_router, prefix=settings.API_V1_PREFIX)
+app.include_router(references_router, prefix=settings.API_V1_PREFIX)
+
+
+@app.get("/")
+async def root():
+    return {"message": "Invoice System MVP", "docs": "/docs"}
 
 
 @app.get("/health")
