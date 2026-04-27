@@ -28,7 +28,10 @@ async def get_current_user(
             detail="Невалидный токен",
         )
 
-    result = await session.execute(select(User).where(User.id == user_id))
+    from sqlalchemy.orm import selectinload
+    result = await session.execute(
+        select(User).options(selectinload(User.roles)).where(User.id == user_id)
+    )
     user = result.scalar_one_or_none()
 
     if user is None or not user.is_active:

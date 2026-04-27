@@ -1,13 +1,15 @@
 import uuid
+from datetime import datetime
 
 from pydantic import BaseModel
 
 
-class RegisterRequest(BaseModel):
-    email: str
-    username: str
-    password: str
-    full_name: str
+class RoleResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+
+    class Config:
+        from_attributes = True
 
 
 class LoginRequest(BaseModel):
@@ -20,12 +22,20 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class RegisterRequest(BaseModel):
+    email: str | None = None
+    username: str
+    password: str
+    full_name: str
+
+
 class UserResponse(BaseModel):
     id: uuid.UUID
-    email: str
+    email: str | None
     username: str
     full_name: str
     is_active: bool
+    roles: list[RoleResponse] = []
 
     class Config:
         from_attributes = True

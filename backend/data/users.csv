@@ -1,0 +1,9 @@
+id_пользователя,логин,хэш_пароля,ФИО,статус_активности,id_роли
+550adb25-7f6d-48d2-8164-0215fb16d485,admin,$2b$12$examplehashforadmin1234567890abcdef,Соколов Максим Андреевич,активен,37ac506a-937c-44ba-9367-fb06637ede93
+47833dd2-8c70-412d-b75a-09a7d9baeee7,buhgalter,$2b$12$examplehashforbuh1234567890abcdef,Лебедева Татьяна Владимировна,активен,b384f720-d906-4493-bd0d-7a74888ca25a
+fb8a3241-afa2-4d02-a8d2-e996679578da,factoring1,$2b$12$cbb66981636f4ffba073d486393541,Иванов Иван Иванович,активен,9e364fe8-c052-415c-b5bc-9b282319f3f4
+29053d62-6765-4d78-aac9-9a02fd71b439,factoring2,$2b$12$bfe322d3bd3a461aa2e9ba31ace7e3,Петров Сергей Александрович,активен,9e364fe8-c052-415c-b5bc-9b282319f3f4
+8534b8b9-a757-4e8c-912c-7a0c8585ec2a,acquiring1,$2b$12$8fcff4cf3eb349e8839ea6588b68ed,Сидорова Анна Петровна,активен,608eec98-3d22-4a2b-ada9-9e927dae487c
+7eb6daf0-00ec-4777-bbb4-6002e15b99db,manager1,$2b$12$57e239f0046b470bbb48048a0505a5,Кузнецова Ольга Викторовна,активен,608eec98-3d22-4a2b-ada9-9e927dae487c
+44d07126-ed6f-4cc5-af47-c5ba32cca468,superadmin,$2b$12$superadminhash1234567890abcdef,Волков Дмитрий Игоревич,активен,37ac506a-937c-44ba-9367-fb06637ede93
+597e60d2-487f-412c-a345-d7d47a9230ef,superadmin,$2b$12$superadminhash1234567890abcdef,Волков Дмитрий Игоревич,активен,b384f720-d906-4493-bd0d-7a74888ca25a
