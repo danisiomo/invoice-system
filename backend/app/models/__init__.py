@@ -5,6 +5,8 @@ from app.models.data_load import DataLoadLog, DataLoadType, DataLoadStatus, Data
 from app.models.regional_center import RegionalCenter
 from app.models.branch import Branch
 from app.models.vat_account import VatAccount
+from app.models.income_account import IncomeAccount
+from app.models.responsible import Responsible
 
 __all__ = [
     "User",
@@ -14,4 +16,6 @@ __all__ = [
     "RegionalCenter",
     "Branch",
     "VatAccount",
+    "IncomeAccount",
+    "Responsible",
 ]
