@@ -127,6 +127,16 @@ Authorization: Bearer <access_token>
 | GET | `/api/v1/references/vat-accounts/{id}` | Получить счёт НДС по ID | Bearer token |
 | PATCH | `/api/v1/references/vat-accounts/{id}` | Редактировать счёт НДС | Bearer token |
 | DELETE | `/api/v1/references/vat-accounts/{id}` | Удалить счёт НДС | Bearer token |
+| GET | `/api/v1/references/income-accounts` | Список счетов доходов | Bearer token |
+| POST | `/api/v1/references/income-accounts` | Добавить счёт доходов | Bearer token |
+| GET | `/api/v1/references/income-accounts/{id}` | Получить счёт доходов по ID | Bearer token |
+| PATCH | `/api/v1/references/income-accounts/{id}` | Редактировать счёт доходов | Bearer token |
+| DELETE | `/api/v1/references/income-accounts/{id}` | Удалить счёт доходов | Bearer token |
+| GET | `/api/v1/references/responsibles` | Список ответственных | Bearer token |
+| POST | `/api/v1/references/responsibles` | Добавить ответственного | Bearer token |
+| GET | `/api/v1/references/responsibles/{id}` | Получить ответственного по ID | Bearer token |
+| PATCH | `/api/v1/references/responsibles/{id}` | Редактировать ответственного | Bearer token |
+| DELETE | `/api/v1/references/responsibles/{id}` | Удалить ответственного | Bearer token |
 
 ## Фильтры журнала загрузки
 
@@ -138,6 +148,17 @@ Authorization: Bearer <access_token>
 | `page` | число от 1 | Номер страницы |
 | `page_size` | число от 1 до 100 | Размер страницы |
 
+
+## Фильтры справочников
+
+| Справочник | Параметры фильтрации |
+|------------|---------------------|
+| Счета НДС | `regional_center_id`, `branch_id`, `account_number` |
+| Счета доходов | `regional_center_id`, `branch_id`, `account_number` |
+| Ответственные | `regional_center_id`, `username` |
+| Отделения | `regional_center_id` |
+
+
 ## Статусы загрузки
 
 | Статус | Описание                  |
@@ -148,12 +169,30 @@ Authorization: Bearer <access_token>
 
 ## Структура БД
 
-| Таблица | Описание |
-|---------|----------|
-| `users` | Пользователи системы |
-| `regional_centers` | Региональные центры |
-| `branches` | Отделения банка |
-| `vat_accounts` | Счета НДС |
-| `data_load_logs` | Журнал загрузки из АБС |
-| `invoice_drafts` | Проекты счетов-фактур |
-| `invoices` | Оформленные счета-фактуры |
+| Таблица | Описание                     |
+|---------|------------------------------|
+| `users` | Пользователи системы         |
+| `roles` | Роли                         |
+| `user_roles` | Связь пользователей и ролей  |
+| `regional_centers` | Региональные центры          |
+| `branches` | Отделения банка              |
+| `vat_accounts` | Счета НДС                    |
+| `income_accounts` | Счета доходов |
+| `responsibles` | Ответственные по СФ |
+| `data_load_logs` | Журнал загрузки из АБС       |
+| `invoice_drafts` | Проекты счетов-фактур        |
+| `invoices` | Оформленные счета-фактуры    |
+
+## Тестовые данные
+
+Все тестовые пользователи логинятся с паролем `Test12345!`
+
+| Логин | Роли |
+|-------|------|
+| `admin` | Администратор |
+| `buhgalter` | Бухгалтер |
+| `superadmin` | Администратор + Бухгалтер |
+| `factoring1` | Сотрудник факторинга |
+| `factoring2` | Сотрудник факторинга |
+| `acquiring1` | Сотрудник эквайринга |
+| `manager1` | Сотрудник эквайринга |
