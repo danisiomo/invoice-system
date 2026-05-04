@@ -44,3 +44,8 @@ class User(Base):
         back_populates="users",
         lazy="selectin",
     )
+    responsible = relationship(
+        "Responsible",
+        back_populates="user",
+        uselist=False,
+    )

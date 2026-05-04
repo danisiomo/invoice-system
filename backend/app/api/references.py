@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from sqlalchemy.orm import selectinload
 from app.core.dependencies import get_current_user
 from app.database import get_session
 from app.models.regional_center import RegionalCenter
@@ -360,26 +360,26 @@ async def delete_income_account(
 @router.get("/responsibles", response_model=ResponsibleListResponse)
 async def list_responsibles(
     regional_center_id: uuid.UUID | None = None,
-    username: str | None = None,
+    user_id: uuid.UUID | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     session: AsyncSession = Depends(get_session),
     _: User = Depends(get_current_user),
 ):
     """Список ответственных с фильтрацией"""
-    query = select(Responsible)
+    query = select(Responsible).options(selectinload(Responsible.user))
 
     if regional_center_id:
         query = query.where(Responsible.regional_center_id == regional_center_id)
-    if username:
-        query = query.where(Responsible.username.ilike(f"%{username}%"))
+    if user_id:
+        query = query.where(Responsible.user_id == user_id)
 
     count_query = select(func.count()).select_from(query.subquery())
     total = (await session.execute(count_query)).scalar() or 0
 
     query = (
         query
-        .order_by(Responsible.full_name)
+        .order_by(Responsible.created_at.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
     )
@@ -395,7 +395,6 @@ async def list_responsibles(
         pages=(total + page_size - 1) // page_size,
     )
 
-
 @router.post("/responsibles", response_model=ResponsibleResponse, status_code=201)
 async def create_responsible(
     data: ResponsibleCreate,
@@ -409,12 +408,22 @@ async def create_responsible(
     if not rc.scalar_one_or_none():
         raise HTTPException(404, "Региональный центр не найден")
 
+    user_check = await session.execute(
+        select(User).where(User.id == data.user_id)
+    )
+    if not user_check.scalar_one_or_none():
+        raise HTTPException(404, "Пользователь не найден")
+
     responsible = Responsible(**data.model_dump())
     session.add(responsible)
     await session.flush()
-    await session.refresh(responsible)
-    return responsible
 
+    result = await session.execute(
+        select(Responsible)
+        .options(selectinload(Responsible.user))
+        .where(Responsible.id == responsible.id)
+    )
+    return result.scalar_one()
 
 @router.get("/responsibles/{responsible_id}", response_model=ResponsibleResponse)
 async def get_responsible(
@@ -422,15 +431,15 @@ async def get_responsible(
     session: AsyncSession = Depends(get_session),
     _: User = Depends(get_current_user),
 ):
-    """Получить ответственного по ID"""
     result = await session.execute(
-        select(Responsible).where(Responsible.id == responsible_id)
+        select(Responsible)
+        .options(selectinload(Responsible.user))
+        .where(Responsible.id == responsible_id)
     )
     responsible = result.scalar_one_or_none()
     if not responsible:
         raise HTTPException(404, "Ответственный не найден")
     return responsible
-
 
 @router.patch("/responsibles/{responsible_id}", response_model=ResponsibleResponse)
 async def update_responsible(
@@ -439,9 +448,10 @@ async def update_responsible(
     session: AsyncSession = Depends(get_session),
     _: User = Depends(get_current_user),
 ):
-    """Редактировать ответственного"""
     result = await session.execute(
-        select(Responsible).where(Responsible.id == responsible_id)
+        select(Responsible)
+        .options(selectinload(Responsible.user))
+        .where(Responsible.id == responsible_id)
     )
     responsible = result.scalar_one_or_none()
     if not responsible:
@@ -454,19 +464,16 @@ async def update_responsible(
     await session.refresh(responsible)
     return responsible
 
-
 @router.delete("/responsibles/{responsible_id}", status_code=204)
 async def delete_responsible(
     responsible_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
     _: User = Depends(get_current_user),
 ):
-    """Удалить ответственного"""
     result = await session.execute(
         select(Responsible).where(Responsible.id == responsible_id)
     )
     responsible = result.scalar_one_or_none()
     if not responsible:
         raise HTTPException(404, "Ответственный не найден")
-
     await session.delete(responsible)

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from sqlalchemy.orm import selectinload
 from app.core.dependencies import get_current_user
 from app.core.security import hash_password, verify_password, create_access_token
 from app.database import get_session
@@ -52,6 +52,19 @@ async def login(
     token = create_access_token(data={"sub": str(user.id)})
     return TokenResponse(access_token=token)
 
+@router.get("/users", response_model=list[UserResponse])
+async def list_users(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+):
+    """Список всех пользователей"""
+    result = await session.execute(
+        select(User)
+        .options(selectinload(User.roles))
+        .where(User.is_active == True)
+        .order_by(User.full_name)
+    )
+    return result.scalars().all()
 
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
