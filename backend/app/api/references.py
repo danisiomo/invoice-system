@@ -26,6 +26,7 @@ from app.schemas.responsible import (
     ResponsibleCreate, ResponsibleUpdate,
     ResponsibleResponse, ResponsibleListResponse,
 )
+from app.core.sorting import get_sort_params, apply_sorting
 
 router = APIRouter(prefix="/references", tags=["Справочники"])
 
@@ -33,13 +34,13 @@ router = APIRouter(prefix="/references", tags=["Справочники"])
 
 @router.get("/regional-centers", response_model=list[RegionalCenterResponse])
 async def list_regional_centers(
+    sort: dict = Depends(get_sort_params),
     session: AsyncSession = Depends(get_session),
     _: User = Depends(get_current_user),
 ):
-    """Список р/ц"""
-    result = await session.execute(
-        select(RegionalCenter).order_by(RegionalCenter.code)
-    )
+    query = select(RegionalCenter)
+    query = apply_sorting(query, RegionalCenter, sort["sort_by"], sort["sort_order"])
+    result = await session.execute(query)
     return result.scalars().all()
 
 
@@ -103,13 +104,14 @@ async def delete_regional_center(
 @router.get("/branches", response_model=list[BranchResponse])
 async def list_branches(
     regional_center_id: uuid.UUID | None = None,
+    sort: dict = Depends(get_sort_params),
     session: AsyncSession = Depends(get_session),
     _: User = Depends(get_current_user),
 ):
-    """Список отделений. Фильтр по р/ц"""
-    query = select(Branch).order_by(Branch.code)
+    query = select(Branch)
     if regional_center_id:
         query = query.where(Branch.regional_center_id == regional_center_id)
+    query = apply_sorting(query, Branch, sort["sort_by"], sort["sort_order"])
     result = await session.execute(query)
     return result.scalars().all()
 
@@ -201,10 +203,12 @@ async def list_vat_accounts(
     account_number: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    sort: dict = Depends(get_sort_params),
     session: AsyncSession = Depends(get_session),
     _: User = Depends(get_current_user),
 ):
     query = select(VatAccount)
+
     if regional_center_id:
         query = query.where(VatAccount.regional_center_id == regional_center_id)
     if branch_id:
@@ -212,17 +216,12 @@ async def list_vat_accounts(
     if account_number:
         query = query.where(VatAccount.account_number.ilike(f"%{account_number}%"))
 
-    # Общее количество
     count_query = select(func.count()).select_from(query.subquery())
     total = (await session.execute(count_query)).scalar() or 0
 
-    # Пагинация, сортировка по н/с
-    query = (
-        query
-        .order_by(VatAccount.account_number)
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-    )
+    # Применяем сортировку
+    query = apply_sorting(query, VatAccount, sort["sort_by"], sort["sort_order"])
+    query = query.offset((page - 1) * page_size).limit(page_size)
 
     result = await session.execute(query)
     accounts = result.scalars().all()
@@ -234,7 +233,6 @@ async def list_vat_accounts(
         page_size=page_size,
         pages=(total + page_size - 1) // page_size,
     )
-
 
 @router.post("/vat-accounts", response_model=VatAccountResponse, status_code=201)
 async def create_vat_account(
@@ -329,10 +327,10 @@ async def list_income_accounts(
     account_number: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    sort: dict = Depends(get_sort_params),
     session: AsyncSession = Depends(get_session),
     _: User = Depends(get_current_user),
 ):
-    """Список счетов доходов с фильтрацией"""
     query = select(IncomeAccount)
 
     if regional_center_id:
@@ -344,15 +342,13 @@ async def list_income_accounts(
 
     count_query = select(func.count()).select_from(query.subquery())
     total = (await session.execute(count_query)).scalar() or 0
-    query = (
-        query
-        .order_by(IncomeAccount.account_number)
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-    )
+
+    query = apply_sorting(query, IncomeAccount, sort["sort_by"], sort["sort_order"])
+    query = query.offset((page - 1) * page_size).limit(page_size)
 
     result = await session.execute(query)
     accounts = result.scalars().all()
+
     return IncomeAccountListResponse(
         items=[IncomeAccountResponse.model_validate(a) for a in accounts],
         total=total,
@@ -360,7 +356,6 @@ async def list_income_accounts(
         page_size=page_size,
         pages=(total + page_size - 1) // page_size,
     )
-
 
 @router.post("/income-accounts", response_model=IncomeAccountResponse, status_code=201)
 async def create_income_account(
@@ -452,10 +447,10 @@ async def list_responsibles(
     user_id: uuid.UUID | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    sort: dict = Depends(get_sort_params),
     session: AsyncSession = Depends(get_session),
     _: User = Depends(get_current_user),
 ):
-    """Список ответственных с фильтрацией"""
     query = select(Responsible).options(selectinload(Responsible.user))
 
     if regional_center_id:
@@ -466,12 +461,8 @@ async def list_responsibles(
     count_query = select(func.count()).select_from(query.subquery())
     total = (await session.execute(count_query)).scalar() or 0
 
-    query = (
-        query
-        .order_by(Responsible.created_at.desc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-    )
+    query = apply_sorting(query, Responsible, sort["sort_by"], sort["sort_order"])
+    query = query.offset((page - 1) * page_size).limit(page_size)
 
     result = await session.execute(query)
     responsibles = result.scalars().all()

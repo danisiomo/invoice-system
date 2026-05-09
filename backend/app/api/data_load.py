@@ -3,7 +3,7 @@ from datetime import datetime, timezone, date, timedelta
 from fastapi import APIRouter, Depends, Query, HTTPException, BackgroundTasks
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from app.core.sorting import get_sort_params, apply_sorting
 from app.core.dependencies import get_current_user
 from app.database import get_session, async_session
 from app.models.data_load import DataLoadLog, DataLoadType, DataLoadStatus, DataLoadPeriod
@@ -179,18 +179,19 @@ async def load_by_account(
 
 @router.get("/log", response_model=DataLoadLogListResponse)
 async def get_load_log(
-    period: DataLoadPeriod | None = Query(
-        None,
-        description="Период: hour, day, week, month, three_months"
-    ),
-    status: DataLoadStatus | None = None,
-    load_type: DataLoadType | None = None,
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    session: AsyncSession = Depends(get_session),
-    _: User = Depends(get_current_user),
+        period: DataLoadPeriod | None = Query(None),
+        status: DataLoadStatus | None = None,
+        load_type: DataLoadType | None = None,
+        page: int = Query(1, ge=1),
+        page_size: int = Query(20, ge=1, le=100),
+        sort_by: str = Query("started_at", description="Поле для сортировки"),
+        sort_order: str = Query("DESC", description="Направление: ASC или DESC"),
+        session: AsyncSession = Depends(get_session),
+        _: User = Depends(get_current_user),
 ):
-    """Журнал загрузок с фильтрацией и пагинацией"""
+    if sort_order.upper() not in ("ASC", "DESC"):
+        raise HTTPException(400, "sort_order должен быть ASC или DESC")
+
     query = select(DataLoadLog)
 
     if period:
@@ -204,12 +205,8 @@ async def get_load_log(
     count_query = select(func.count()).select_from(query.subquery())
     total = (await session.execute(count_query)).scalar() or 0
 
-    query = (
-        query
-        .order_by(DataLoadLog.started_at.desc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-    )
+    query = apply_sorting(query, DataLoadLog, sort_by, sort_order.upper())
+    query = query.offset((page - 1) * page_size).limit(page_size)
 
     result = await session.execute(query)
     logs = result.scalars().all()
