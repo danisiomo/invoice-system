@@ -10,8 +10,8 @@ from app.models.regional_center import RegionalCenter
 from app.models.branch import Branch
 from app.models.vat_account import VatAccount
 from app.models.user import User
-from app.schemas.regional_center import RegionalCenterCreate, RegionalCenterResponse
-from app.schemas.branch import BranchCreate, BranchResponse
+from app.schemas.regional_center import RegionalCenterCreate, RegionalCenterResponse, RegionalCenterUpdate
+from app.schemas.branch import BranchCreate, BranchResponse, BranchUpdate
 from app.schemas.vat_account import (
     VatAccountCreate, VatAccountUpdate,
     VatAccountResponse, VatAccountListResponse,
@@ -62,6 +62,43 @@ async def create_regional_center(
     await session.refresh(rc)
     return rc
 
+@router.patch("/regional-centers/{rc_id}", response_model=RegionalCenterResponse)
+async def update_regional_center(
+    rc_id: uuid.UUID,
+    data: RegionalCenterUpdate,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+):
+    """Редактировать региональный центр"""
+    result = await session.execute(
+        select(RegionalCenter).where(RegionalCenter.id == rc_id)
+    )
+    rc = result.scalar_one_or_none()
+    if not rc:
+        raise HTTPException(404, "Региональный центр не найден")
+
+    for field, value in data.model_dump(exclude_unset=True).items():
+        setattr(rc, field, value)
+
+    await session.flush()
+    await session.refresh(rc)
+    return rc
+
+@router.delete("/regional-centers/{rc_id}", status_code=204)
+async def delete_regional_center(
+    rc_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+):
+    """Удалить региональный центр"""
+    result = await session.execute(
+        select(RegionalCenter).where(RegionalCenter.id == rc_id)
+    )
+    rc = result.scalar_one_or_none()
+    if not rc:
+        raise HTTPException(404, "Региональный центр не найден")
+    await session.delete(rc)
+
 #  Отделения
 @router.get("/branches", response_model=list[BranchResponse])
 async def list_branches(
@@ -102,6 +139,58 @@ async def create_branch(
     await session.flush()
     await session.refresh(branch)
     return branch
+
+@router.get("/branches/{branch_id}", response_model=BranchResponse)
+async def get_branch(
+    branch_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+):
+    """Получить отделение по ID"""
+    result = await session.execute(
+        select(Branch).where(Branch.id == branch_id)
+    )
+    branch = result.scalar_one_or_none()
+    if not branch:
+        raise HTTPException(404, "Отделение не найдено")
+    return branch
+
+@router.patch("/branches/{branch_id}", response_model=BranchResponse)
+async def update_branch(
+    branch_id: uuid.UUID,
+    data: BranchUpdate,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+):
+    """Редактировать отделение"""
+    result = await session.execute(
+        select(Branch).where(Branch.id == branch_id)
+    )
+    branch = result.scalar_one_or_none()
+    if not branch:
+        raise HTTPException(404, "Отделение не найдено")
+
+    for field, value in data.model_dump(exclude_unset=True).items():
+        setattr(branch, field, value)
+
+    await session.flush()
+    await session.refresh(branch)
+    return branch
+
+@router.delete("/branches/{branch_id}", status_code=204)
+async def delete_branch(
+    branch_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+):
+    """Удалить отделение"""
+    result = await session.execute(
+        select(Branch).where(Branch.id == branch_id)
+    )
+    branch = result.scalar_one_or_none()
+    if not branch:
+        raise HTTPException(404, "Отделение не найдено")
+    await session.delete(branch)
 
 #  Справочник счетов ндс
 

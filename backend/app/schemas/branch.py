@@ -25,3 +25,11 @@ class BranchResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class BranchUpdate(BaseModel):
+    code: str | None = None
+    name: str | None = None
+    address: str | None = None
+    inn: str | None = None
+    kpp: str | None = None
+    regional_center_id: uuid.UUID | None = None

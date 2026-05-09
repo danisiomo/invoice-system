@@ -17,3 +17,7 @@ class RegionalCenterResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class RegionalCenterUpdate(BaseModel):
+    code: str | None = None
+    name: str | None = None
