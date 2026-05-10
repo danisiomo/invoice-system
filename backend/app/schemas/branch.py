@@ -11,6 +11,7 @@ class BranchCreate(BaseModel):
     inn: str | None = None
     kpp: str | None = None
     regional_center_id: uuid.UUID
+    auto_confirm: bool = False
 
 
 class BranchResponse(BaseModel):
@@ -21,6 +22,7 @@ class BranchResponse(BaseModel):
     inn: str | None
     kpp: str | None
     regional_center_id: uuid.UUID
+    auto_confirm: bool
     created_at: datetime
 
     class Config:
@@ -33,3 +35,4 @@ class BranchUpdate(BaseModel):
     inn: str | None = None
     kpp: str | None = None
     regional_center_id: uuid.UUID | None = None
+    auto_confirm: bool | None = None
