@@ -7,6 +7,7 @@ from app.models.branch import Branch
 from app.models.vat_account import VatAccount
 from app.models.income_account import IncomeAccount
 from app.models.responsible import Responsible
+from app.models.counterparty import Counterparty
 
 __all__ = [
     "User",
@@ -18,4 +19,5 @@ __all__ = [
     "VatAccount",
     "IncomeAccount",
     "Responsible",
+    "Counterparty",
 ]
