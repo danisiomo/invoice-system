@@ -8,6 +8,7 @@ from app.models.vat_account import VatAccount
 from app.models.income_account import IncomeAccount
 from app.models.responsible import Responsible
 from app.models.counterparty import Counterparty
+from app.models.transaction import Transaction, TransactionType, TransactionStatus
 
 __all__ = [
     "User",
@@ -20,4 +21,5 @@ __all__ = [
     "IncomeAccount",
     "Responsible",
     "Counterparty",
+    "Transaction", "TransactionType", "TransactionStatus",
 ]
