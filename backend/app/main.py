@@ -12,6 +12,7 @@ from app.api.mock_abs import router as mock_abs_router
 from app.api.sync import router as sync_router
 from app.services.counterparty_sync import sync_counterparties
 from app.api.transactions import router as transactions_router
+from app.services.matching_service import match_transactions
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -27,17 +28,24 @@ async def daily_sync_job():
         await sync_counterparties()
         await asyncio.sleep(86400)  # 24 часа
 
+async def matching_job():
+    """
+    Джоба связывания проводок.
+    Запускается каждые 5 минут.
+    """
+    while True:
+        logger.info("Автоджоба: запуск связывания проводок")
+        await match_transactions()
+        await asyncio.sleep(300)  # 5 минут
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Запуск приложения...")
-
     # Запускаем джобу синхронизации в фоне
     asyncio.create_task(daily_sync_job())
-    logger.info("Джоба синхронизации контрагентов запущена")
-
+    asyncio.create_task(matching_job())
+    logger.info("Джобы запущены")
     yield
-
     logger.info("Остановка приложения...")
 
 

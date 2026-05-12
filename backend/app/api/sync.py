@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, BackgroundTasks
 from app.core.dependencies import get_current_user
 from app.models.user import User
 from app.services.counterparty_sync import sync_counterparties
+from app.services.matching_service import match_transactions
 
 router = APIRouter(prefix="/sync", tags=["Синхронизация"])
 
@@ -18,4 +19,16 @@ async def manual_sync_counterparties(
     return {
         "status": "started",
         "message": "Синхронизация контрагентов запущена в фоне"
+    }
+
+@router.post("/match-transactions")
+async def manual_match_transactions(
+    background_tasks: BackgroundTasks,
+    _: User = Depends(get_current_user),
+):
+    """Ручной запуск связывания проводок. Запускается в фоне - сразу возвращает ответ."""
+    background_tasks.add_task(match_transactions)
+    return {
+        "status": "started",
+        "message": "Связывание проводок запущено в фоне"
     }

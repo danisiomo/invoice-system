@@ -73,19 +73,22 @@ async def list_transactions(
 
 @router.post("", response_model=TransactionResponse, status_code=201)
 async def create_transaction(
-    data: TransactionCreate,
-    session: AsyncSession = Depends(get_session),
-    _: User = Depends(get_current_user),
+        data: TransactionCreate,
+        session: AsyncSession = Depends(get_session),
+        _: User = Depends(get_current_user),
 ):
-    """Создать одну проводку. Используется для тестирования пока нет RabbitMQ Consumer"""
-    # Проверяем уникальность external_id
     existing = await session.execute(
         select(Transaction).where(Transaction.external_id == data.external_id)
     )
     if existing.scalar_one_or_none():
         raise HTTPException(400, f"Проводка с external_id={data.external_id} уже существует")
 
-    transaction = Transaction(**data.model_dump())
+    data_dict = data.model_dump()
+    tt = data_dict["transaction_type"]
+    data_dict["transaction_type"] = tt.value if hasattr(tt, "value") else str(tt).lower()
+    data_dict["status"] = "new"
+
+    transaction = Transaction(**data_dict)
     session.add(transaction)
     await session.flush()
     await session.refresh(transaction)
@@ -98,11 +101,6 @@ async def create_transactions_batch(
     session: AsyncSession = Depends(get_session),
     _: User = Depends(get_current_user),
 ):
-    """
-    Создать пачку проводок за один запрос.
-    Используется для загрузки тестовых данных.
-    Если проводка с таким external_id уже есть — пропускаем.
-    """
     created = 0
     skipped = 0
     errors = 0
@@ -118,10 +116,14 @@ async def create_transactions_batch(
                 skipped += 1
                 continue
 
-            transaction = Transaction(**item.model_dump())
+            item_dict = item.model_dump()
+            tt = item_dict["transaction_type"]
+            item_dict["transaction_type"] = tt.value if hasattr(tt, "value") else str(tt).lower()
+            item_dict["status"] = "new"
+
+            transaction = Transaction(**item_dict)
             session.add(transaction)
             created += 1
-
         except Exception:
             errors += 1
             continue
