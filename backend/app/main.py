@@ -11,6 +11,7 @@ from app.api.counterparties import router as counterparties_router
 from app.api.mock_abs import router as mock_abs_router
 from app.api.sync import router as sync_router
 from app.services.counterparty_sync import sync_counterparties
+from app.api.transactions import router as transactions_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -60,7 +61,7 @@ app.include_router(references_router, prefix=settings.API_V1_PREFIX)
 app.include_router(counterparties_router, prefix=settings.API_V1_PREFIX)
 app.include_router(mock_abs_router, prefix=settings.API_V1_PREFIX)
 app.include_router(sync_router, prefix=settings.API_V1_PREFIX)
-
+app.include_router(transactions_router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/")
 async def root():
