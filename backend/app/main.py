@@ -13,6 +13,7 @@ from app.api.sync import router as sync_router
 from app.services.counterparty_sync import sync_counterparties
 from app.api.transactions import router as transactions_router
 from app.services.matching_service import match_transactions
+from app.api.invoices import router as invoices_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -70,6 +71,7 @@ app.include_router(counterparties_router, prefix=settings.API_V1_PREFIX)
 app.include_router(mock_abs_router, prefix=settings.API_V1_PREFIX)
 app.include_router(sync_router, prefix=settings.API_V1_PREFIX)
 app.include_router(transactions_router, prefix=settings.API_V1_PREFIX)
+app.include_router(invoices_router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/")
 async def root():
