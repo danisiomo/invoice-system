@@ -14,6 +14,8 @@ from app.services.counterparty_sync import sync_counterparties
 from app.api.transactions import router as transactions_router
 from app.services.matching_service import match_transactions
 from app.api.invoices import router as invoices_router
+from app.mq.consumer import start_consumer
+from app.mq.connection import close_rabbitmq
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -45,9 +47,14 @@ async def lifespan(app: FastAPI):
     # Запускаем джобу синхронизации в фоне
     asyncio.create_task(daily_sync_job())
     asyncio.create_task(matching_job())
+    # Consumer RabbitMQ
+    app.state.rmq_connection = await start_consumer()
     logger.info("Джобы запущены")
     yield
     logger.info("Остановка приложения...")
+    conn = getattr(app.state, "rmq_connection", None)
+    if conn:
+        await conn.close()
 
 
 app = FastAPI(

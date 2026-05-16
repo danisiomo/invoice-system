@@ -87,22 +87,52 @@ async def update_invoice(
     invoice_id: uuid.UUID,
     data: InvoiceUpdate,
     session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(get_current_user),
 ):
-    """Редактирование с/ф бухгалтером"""
-    result = await session.execute(
-        select(Invoice).where(Invoice.id == invoice_id)
-    )
+    """Редактирование с/ф (только черновик/на проверке)"""
+    result = await session.execute(select(Invoice).where(Invoice.id == invoice_id))
     invoice = result.scalar_one_or_none()
     if not invoice:
-        raise HTTPException(404, "Счёт-фактура не найдена")
+        raise HTTPException(404, "Счёт‑фактура не найдена")
 
-    if invoice.status in ("sent", "cancelled"):
-        raise HTTPException(400, "Нельзя редактировать эту СФ")
+    # Редактируем только пока документ не подтверждён/не отправлен/не отменён
+    if invoice.status in ("approved", "sent", "cancelled"):
+        raise HTTPException(
+            400,
+            "Нельзя редактировать эту СФ. Если нужно исправить — верните в черновик отдельной операцией.",
+        )
 
-    for field, value in data.model_dump(exclude_unset=True).items():
-        setattr(invoice, field, value)
+    # Статусы через патч не меняются
+    update_data = data.model_dump(exclude_unset=True, exclude={"status"})
 
+    # Список полей для редактирования
+    allowed_fields = {
+        "service_name",
+        "service_code",
+        "unit_name",
+        "quantity",
+        "price",
+        "vat_rate",
+        "special_sales_book",
+        "inter_price_difference",
+        "correction_number",
+        "payment_document_number",
+        "payment_date",
+        "counterparty_id",
+        "branch_id",
+        "regional_center_id",
+        "currency_code",
+        "country_code",
+    }
+    changed_fields = set()
+    for field, value in update_data.items():
+        if field in allowed_fields:
+            setattr(invoice, field, value)
+            changed_fields.add(field)
+    # Пересчёт сумм
+    if changed_fields.intersection({"quantity", "price", "vat_rate"}):
+        from app.services.invoice_calc import recalc_invoice_amounts
+        recalc_invoice_amounts(invoice)
     await session.flush()
     await session.refresh(invoice)
     return invoice
@@ -131,6 +161,26 @@ async def approve_invoice(
     await session.refresh(invoice)
     return invoice
 
+@router.post("/{invoice_id}/return-to-draft", response_model=InvoiceResponse)
+async def return_invoice_to_draft(
+    invoice_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+):
+    result = await session.execute(select(Invoice).where(Invoice.id == invoice_id))
+    invoice = result.scalar_one_or_none()
+    if not invoice:
+        raise HTTPException(404, "Счёт-фактура не найдена")
+    if invoice.status == "sent":
+        raise HTTPException(400, "Нельзя вернуть в черновик отправленную СФ")
+    if invoice.status != "approved":
+        raise HTTPException(400, f"Вернуть в черновик можно только approved, сейчас статус '{invoice.status}'")
+
+    invoice.status = "draft"
+    invoice.confirmed_by_id = None
+    await session.flush()
+    await session.refresh(invoice)
+    return invoice
 
 @router.post("/{invoice_id}/cancel", response_model=InvoiceResponse)
 async def cancel_invoice(

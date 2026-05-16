@@ -63,7 +63,7 @@ class InvoiceListPaginated(BaseModel):
 
 
 class InvoiceUpdate(BaseModel):
-    status: str | None = None
+    #status: str | None = None
     service_name: str | None = None
     service_code: str | None = None
     unit_name: str | None = None

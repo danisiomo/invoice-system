@@ -22,6 +22,22 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "super-secret-key-change-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    # RabbitMQ
+    RABBITMQ_HOST: str = "localhost"
+    RABBITMQ_PORT: int = 5672
+    RABBITMQ_USER: str = "rabbit_user"
+    RABBITMQ_PASSWORD: str = "rabbit_pass"
+
+    # Очереди
+    QUEUE_INCOMING_TRANSACTIONS: str = "abs.transactions.incoming"
+    QUEUE_OUTGOING_INVOICES: str = "edo.invoices.outgoing"
+
+    @property
+    def rabbitmq_url(self) -> str:
+        return (
+            f"amqp://{self.RABBITMQ_USER}:{self.RABBITMQ_PASSWORD}"
+            f"@{self.RABBITMQ_HOST}:{self.RABBITMQ_PORT}/"
+        )
 
     class Config:
         env_file = ".env"

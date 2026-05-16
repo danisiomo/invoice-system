@@ -3,6 +3,14 @@ from app.core.dependencies import get_current_user
 from app.models.user import User
 from app.services.counterparty_sync import sync_counterparties
 from app.services.matching_service import match_transactions
+import uuid
+from fastapi import HTTPException
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.database import get_session
+from app.models.invoice import Invoice
+from app.services.edo_sender import send_approved_invoices, send_invoice_to_edo
+from sqlalchemy.orm import selectinload
 
 router = APIRouter(prefix="/sync", tags=["Синхронизация"])
 
@@ -32,3 +40,33 @@ async def manual_match_transactions(
         "status": "started",
         "message": "Связывание проводок запущено в фоне"
     }
+
+@router.post("/send-approved-invoices")
+async def manual_send_approved_invoices(
+    limit: int = 100,
+    _: User = Depends(get_current_user),
+):
+    return await send_approved_invoices(limit=limit)
+
+
+@router.post("/send-invoice/{invoice_id}")
+async def manual_send_one_invoice(
+    invoice_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+):
+    result = await session.execute(
+        select(Invoice)
+        .options(selectinload(Invoice.counterparty), selectinload(Invoice.branch))
+        .where(Invoice.id == invoice_id)
+    )
+    invoice = result.scalar_one_or_none()
+    if not invoice:
+        raise HTTPException(404, "Invoice not found")
+    if invoice.status != "approved":
+        raise HTTPException(400, f"Invoice status must be approved, got '{invoice.status}'")
+
+    await send_invoice_to_edo(session, invoice)
+    await session.flush()
+    await session.refresh(invoice)
+    return {"status": "ok", "invoice_id": str(invoice.id), "new_status": invoice.status}
