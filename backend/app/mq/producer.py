@@ -37,3 +37,24 @@ async def publish_invoice_to_edo(message: dict) -> None:
         logger.info("Producer: invoice published to EDO queue number=%s", message.get("number"))
     finally:
         await connection.close()
+
+async def publish_invoices_to_edo(messages: list[dict]) -> None:
+    """Публикация пачки сообщений в очередь ЭДО одним соединением."""
+    connection = await aio_pika.connect_robust(settings.rabbitmq_url)
+    try:
+        channel = await connection.channel()
+        await channel.declare_queue(settings.QUEUE_OUTGOING_INVOICES, durable=True)
+
+        for message in messages:
+            body = json.dumps(message, ensure_ascii=False, default=_json_default).encode("utf-8")
+            amqp_message = aio_pika.Message(
+                body=body,
+                content_type="application/json",
+                delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+            )
+            await channel.default_exchange.publish(
+                amqp_message,
+                routing_key=settings.QUEUE_OUTGOING_INVOICES,
+            )
+    finally:
+        await connection.close()

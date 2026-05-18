@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import async_session
 from app.models.transaction import Transaction, TransactionType, TransactionStatus
 from app.models.invoice import Invoice, InvoiceStatus
+from sqlalchemy import select, text
 
 logger = logging.getLogger(__name__)
 
@@ -24,15 +25,8 @@ async def generate_invoice_number(session: AsyncSession) -> str:
     now = datetime.now(timezone.utc)
     year = now.year
 
-    # Считаем сколько СФ уже есть в этом году
-    from sqlalchemy import func, extract
-    result = await session.execute(
-        select(func.count(Invoice.id)).where(
-            extract("year", Invoice.created_at) == year
-        )
-    )
-    count = result.scalar() or 0
-    return f"СФ-{year}-{str(count + 1).zfill(4)}"
+    seq_val = (await session.execute(text("SELECT nextval('invoice_number_seq')"))).scalar_one()
+    return f"СФ-{year}-{str(int(seq_val)).zfill(4)}"
 
 
 async def create_invoice_from_pair(
@@ -74,53 +68,59 @@ async def create_invoice_from_pair(
     return invoice
 
 
-async def match_transactions() -> dict:
+async def match_transactions(limit: int = 200) -> dict:
+    """Связывает проводки пачками и создаёт СФ.
+    Важно: используем блокировки строк FOR UPDATE SKIP LOCKED,
+    чтобы параллельные запуски не обрабатывали одни и те же проводки.
+    """
     logger.info("Запуск сервиса связывания проводок...")
     matched_pairs = 0
     created_invoices = 0
     errors = 0
 
     async with async_session() as session:
-        result = await session.execute(
-            select(Transaction).where(
-                Transaction.status == "new",
-                Transaction.transaction_type == "income",
-            )
-        )
-        income_transactions = result.scalars().all()
-        logger.info(f"Найдено новых доходных проводок: {len(income_transactions)}")
-
-        for income_tx in income_transactions:
-            try:
-                vat_result = await session.execute(
-                    select(Transaction).where(
-                        Transaction.link_key == income_tx.link_key,
-                        Transaction.transaction_type == "vat",
-                        Transaction.status == "new",
-                    )
+        async with session.begin():
+            # Берём пачку доходных проводок и блокируем их
+            result = await session.execute(
+                select(Transaction)
+                .where(
+                    Transaction.status == "new",
+                    Transaction.transaction_type == "income",
                 )
-                vat_tx = vat_result.scalar_one_or_none()
+                .order_by(Transaction.transaction_date.asc())
+                .limit(limit)
+                .with_for_update(skip_locked=True)
+            )
+            income_transactions = result.scalars().all()
+            logger.info(f"Найдено новых доходных проводок: {len(income_transactions)}")
 
-                if not vat_tx:
-                    logger.debug(
-                        f"Парная НДС проводка не найдена для {income_tx.external_id}"
+            for income_tx in income_transactions:
+                try:
+                    # Пытаемся взять парную НДС‑проводку и тоже блокируем её
+                    vat_result = await session.execute(
+                        select(Transaction)
+                        .where(
+                            Transaction.link_key == income_tx.link_key,
+                            Transaction.transaction_type == "vat",
+                            Transaction.status == "new",
+                        )
+                        .limit(1)
+                        .with_for_update(skip_locked=True)
                     )
-                    continue
+                    vat_tx = vat_result.scalar_one_or_none()
+                    if not vat_tx:
+                        continue
+                    # Можно оставить matched как промежуточный статус (для отладки)
+                    income_tx.status = "matched"
+                    vat_tx.status = "matched"
+                    matched_pairs += 1
+                    await create_invoice_from_pair(session, income_tx, vat_tx)
+                    created_invoices += 1
 
-                income_tx.status = "matched"
-                vat_tx.status = "matched"
-                matched_pairs += 1
-
-                await create_invoice_from_pair(session, income_tx, vat_tx)
-                created_invoices += 1
-
-            except Exception as e:
-                logger.error(f"Ошибка обработки проводки {income_tx.external_id}: {e}")
-                income_tx.status = "error"
-                errors += 1
-                continue
-
-        await session.commit()
+                except Exception as e:
+                    logger.error(f"Ошибка обработки проводки {income_tx.external_id}: {e}")
+                    income_tx.status = "error"
+                    errors += 1
 
     result = {
         "status": "success",

@@ -16,45 +16,71 @@ from app.services.matching_service import match_transactions
 from app.api.invoices import router as invoices_router
 from app.mq.consumer import start_consumer
 from app.mq.connection import close_rabbitmq
+from app.services.edo_sender import send_approved_invoices
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 async def daily_sync_job():
-    """
-    Джоба синхронизации контрагентов.
-    Запускается раз в день (86400 секунд).
-    """
-    while True:
-        logger.info("Автоджоба: запуск синхронизации контрагентов")
-        await sync_counterparties()
-        await asyncio.sleep(86400)  # 24 часа
+    """Джоба синхронизации контрагентов (раз в сутки)."""
+    try:
+        while True:
+            logger.info("Автоджоба: запуск синхронизации контрагентов")
+            await sync_counterparties()
+            await asyncio.sleep(86400)
+    except asyncio.CancelledError:
+        logger.info("Автоджоба: синхронизация контрагентов остановлена")
+        raise
 
 async def matching_job():
-    """
-    Джоба связывания проводок.
-    Запускается каждые 5 минут.
-    """
-    while True:
-        logger.info("Автоджоба: запуск связывания проводок")
-        await match_transactions()
-        await asyncio.sleep(300)  # 5 минут
+    """Джоба связывания проводок (каждые 5 минут)"""
+    try:
+        while True:
+            logger.info("Автоджоба: запуск связывания проводок")
+            await match_transactions(limit=200)
+            await asyncio.sleep(300)
+    except asyncio.CancelledError:
+        logger.info("Автоджоба: связывание проводок остановлено")
+        raise
+
+async def edo_send_job():
+    """Джоба отправки подтверждённых СФ в ЭДО. Запускается каждые 5 секунд"""
+    try:
+        while True:
+            logger.info("Автоджоба: отправка подтверждённых СФ в ЭДО")
+            await send_approved_invoices(limit=100)
+            await asyncio.sleep(5)
+    except asyncio.CancelledError:
+        logger.info("Автоджоба: отправка в ЭДО остановлена")
+        raise
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Запуск приложения...")
-    # Запускаем джобу синхронизации в фоне
-    asyncio.create_task(daily_sync_job())
-    asyncio.create_task(matching_job())
-    # Consumer RabbitMQ
+    #Запускаем фоновые задачи и сохраняем ссылки (важно для shutdown)
+    app.state.tasks = [
+        asyncio.create_task(daily_sync_job(), name="job_sync_counterparties"),
+        asyncio.create_task(matching_job(), name="job_matching"),
+        asyncio.create_task(edo_send_job(), name="job_send_edo"),
+    ]
+    #Запускаем RabbitMQ consumer (вход)
     app.state.rmq_connection = await start_consumer()
-    logger.info("Джобы запущены")
-    yield
-    logger.info("Остановка приложения...")
-    conn = getattr(app.state, "rmq_connection", None)
-    if conn:
-        await conn.close()
+    logger.info("Джобы и consumer запущены")
+    try:
+        yield
+    finally:
+        logger.info("Остановка приложения...")
+        #Останавливаем фоновые задачи
+        tasks = getattr(app.state, "tasks", [])
+        for t in tasks:
+            t.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        #Закрываем RabbitMQ соединение
+        conn = getattr(app.state, "rmq_connection", None)
+        if conn:
+            await conn.close()
+        logger.info("Приложение остановлено")
 
 
 app = FastAPI(

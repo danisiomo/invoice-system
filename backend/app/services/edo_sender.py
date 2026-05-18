@@ -63,35 +63,43 @@ async def send_invoice_to_edo(session: AsyncSession, invoice: Invoice) -> None:
 
 
 async def send_approved_invoices(limit: int = 100) -> dict:
-    """Отправка пачки approved - sent"""
+    """Отправка пачки approved → sent"""
     sent = 0
-    skipped = 0
     errors = 0
 
     async with async_session() as session:
-        result = await session.execute(
-            select(Invoice)
-            .options(selectinload(Invoice.counterparty), selectinload(Invoice.branch))
-            .where(Invoice.status == "approved")
-            .order_by(Invoice.created_at.asc())
-            .limit(limit)
-        )
-        invoices = result.scalars().all()
+        async with session.begin():
+            result = await session.execute(
+                select(Invoice)
+                .options(selectinload(Invoice.counterparty), selectinload(Invoice.branch))
+                .where(Invoice.status == "approved")
+                .order_by(Invoice.created_at.asc())
+                .limit(limit)
+                .with_for_update(skip_locked=True)
+            )
+            invoices = result.scalars().all()
 
-        for inv in invoices:
+            if not invoices:
+                return {"status": "ok", "sent": 0, "errors": 0, "total": 0}
+
+            # Готовим сообщения один раз
+            messages = [build_edo_message(inv) for inv in invoices]
+
             try:
-                # защита от повторной отправки
-                if inv.status == "sent":
-                    skipped += 1
-                    continue
+                # Публикация пачкой одним соединением
+                from app.mq.producer import publish_invoices_to_edo
+                await publish_invoices_to_edo(messages)
 
-                await send_invoice_to_edo(session, inv)
-                sent += 1
+                now = datetime.now(timezone.utc)
+                for inv in invoices:
+                    inv.status = "sent"
+                    inv.sent_at = now
+                    sent += 1
+
             except Exception as e:
-                logger.exception("EDO send error invoice_id=%s: %s", inv.id, e)
-                inv.status = "error"
-                errors += 1
+                logger.exception("Ошибка отправки пачки СФ в ЭДО: %s", e)
+                for inv in invoices:
+                    inv.status = "error"
+                    errors += 1
 
-        await session.commit()
-
-    return {"status": "ok", "sent": sent, "skipped": skipped, "errors": errors, "total": sent + skipped + errors}
+    return {"status": "ok", "sent": sent, "errors": errors, "total": sent + errors}
